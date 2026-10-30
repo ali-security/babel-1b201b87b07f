@@ -150,7 +150,7 @@ test: lint test-only
 test-ci: jest-ci
 
 jest-ci: build-standalone-ci
-	BABEL_ENV=test $(YARN) jest --maxWorkers=4 --ci
+	BABEL_ENV=test $(YARN) jest --maxWorkers=4 --ci $${JEST_CI_ARGS:+"$$JEST_CI_ARGS"}
 	$(MAKE) test-clean
 
 # Does not work on Windows
