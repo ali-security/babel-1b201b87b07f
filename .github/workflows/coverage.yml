@@ -1,21 +1,54 @@
 name: Report Coverage
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: "Optional Jest test path pattern to scope the coverage run"
+        required: false
+        default: ""
+
+env:
+  BROWSERSLIST_IGNORE_OLD_DATA: "1"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Use Node.js latest
-        uses: actions/setup-node@v2-beta
+        uses: actions/setup-node@v4
         with:
-          node-version: "*"
+          node-version: "14"
+      - name: Use the registry as of the release
+        run: |
+          npm config set registry https://:2020-05-30T19%3A25%3A10.179Z@time-machines-npm.sealsecurity.io/
+          npm config set always-auth true
+          yarn config set registry https://:2020-05-30T19%3A25%3A10.179Z@time-machines-npm.sealsecurity.io/
+      - name: Build and pack @babel/runtime-corejs2
+        run: |
+          make bootstrap-only
+          make prepublish-build
+          mkdir -p "$GITHUB_WORKSPACE/seal-artifacts"
+          cd packages/babel-runtime-corejs2
+          npm pack
+          mv babel-runtime-corejs2-*.tgz "$GITHUB_WORKSPACE/seal-artifacts/runtime-corejs2-7.10.2.tgz"
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-corejs2
+          path: seal-artifacts/runtime-corejs2-7.10.2.tgz
+          if-no-files-found: error
       - name: Generate coverage report
         run: |
-          make -j test-ci-coverage
+          TEST_FILTER="${{ inputs.test-filter }}" make -j test-ci-coverage
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+      # Reprint the skipped-test report written by scripts/jest-skipped-reporter.js; the codecov output above buries it
+      - name: List skipped tests
+        if: always()
+        run: cat jest-skipped.txt
